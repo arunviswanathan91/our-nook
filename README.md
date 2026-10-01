@@ -2,7 +2,7 @@
 
 A cozy, private web app for any couple: little notes, photos, music links, two local clocks, and a game you can play across time zones. Install the same web app on iPhone or Android.
 
-**Status:** the app and Supabase migration are implemented. A live Supabase project, email delivery, hosting, and Telegram bot must be configured before real sign-ins work. Without frontend configuration, the app displays a setup message.
+**Status:** the database is deployed to the existing **our nook** Supabase project in Singapore, and its publishable frontend configuration is saved in `deployment/production.json`. Live SQL access checks passed. Dashboard authentication settings, email delivery, web hosting, and the optional Telegram bot still need to be completed before the app can be used end to end.
 
 ## Access by partner code
 
@@ -49,6 +49,8 @@ Use a **publishable key** in the frontend. Never put a Supabase secret/service-r
 
 ## Supabase setup
 
+The existing **our nook** project (`lqdkyarlihfprvoqmfdo`) already has both migrations applied. Their repository timestamps match Supabase’s recorded deployment history. Do not reapply the initial migration manually to this project. The steps below are for another fresh deployment.
+
 Use a new, dedicated Supabase project. This migration creates the application's tables, functions, indexes, policies, private photo bucket, and realtime publication entries. It assumes Supabase's standard `auth` and `storage` schemas.
 
 ```sh
@@ -58,7 +60,7 @@ npx supabase db push --dry-run
 npx supabase db push
 ```
 
-The CLI reads `supabase/migrations/20260930223241_couple_spaces.sql`. Alternatively, apply that file once in a new project's SQL editor, then reconcile migration history before later CLI pushes.
+The CLI applies both files in `supabase/migrations/` in timestamp order. Alternatively, apply both SQL files once, in that order, in a new project's SQL editor, then reconcile migration history before later CLI pushes.
 
 In the Supabase dashboard:
 
@@ -77,6 +79,8 @@ Build the frontend:
 ```sh
 npm run build
 ```
+
+For this repository’s configured deployment, run **`npm run build:production`**. It reads the public URL and publishable key from `deployment/production.json`; no server secret is stored there. For a separate deployment, edit that file or continue using your own `VITE_` build variables with `npm run build`.
 
 Deploy `dist/` with any HTTPS static host. Set the `VITE_` variables at **build time**, then rebuild whenever they change. Navigation uses in-app state, so no server-side route handling is required. Vite's relative asset base also supports a subdirectory such as GitHub Pages. Do not publish `.env` files or the source directory as the site.
 
@@ -131,6 +135,12 @@ deno check supabase/functions/telegram-webhook/index.ts
 - Browser tests use a mocked Supabase transport, including valid/invalid join flows and layouts at 320, 390, 768, and 1440 pixels. These tests do **not** prove real email delivery, deployed Storage, Realtime, or Telegram connectivity.
 
 Before opening the live app to others, test with two real accounts and a third outsider: email sign-in, code join, photo upload/read/delete, alternating moves on two devices, sign-out/sign-in, and Telegram link/save/disconnect. Verify the outsider cannot read either partner's rows or photos. Check the installed app on physical iPhone and Android devices.
+
+## Live database verification
+
+The migration was applied to `lqdkyarlihfprvoqmfdo`, including private photo Storage and realtime publications. `supabase/tests/live_access_smoke.sql` verifies partner joining, shared reads, game moves, outsider isolation, two-person capacity, and anonymous denial inside a transaction. It rolls back every synthetic row and sends no emails. The live database was checked afterward: zero Auth users, couple spaces, or posts remained.
+
+Supabase’s advisors reported no security warnings or errors after setup. Five [RLS-without-policy informational notices](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy) are intentional for internal tables in the unexposed `nook_private` schema: clients have no direct table access, and only authorized functions access them. [Unused-index notices](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index) are expected for an empty app. The [unindexed-foreign-key findings](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys) were fixed by the second migration.
 
 ## Design notes and current limits
 

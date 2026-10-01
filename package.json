@@ -12,7 +12,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "test:db": "node --test tests/database.test.mjs",
-    "test:ui": "playwright test"
+    "test:ui": "playwright test",
+    "build:production": "node scripts/build-production.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.2",
