@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { ArrowRight, Camera, Check, Copy, Gamepad2, Heart, HeartHandshake, Home, Image, KeyRound, Link, LoaderCircle, LogOut, Mail, Music2, Plus, Send, Settings, ShieldCheck, Sparkles, Trash2, Users, X } from 'lucide-react'
-import { botUsername, clock, configured, createPost, db, deviceTimezone, errorText, loadNook, localDay, rpc, safeMusicUrl, supabase, validTimezone, type Couple, type Nook, type Post, type Profile } from './lib'
+import { botUsername, clock, createPost, db, deviceTimezone, errorText, initialAuthError, initialPasswordRecovery, loadNook, localDay, rpc, safeMusicUrl, signOut, supabase, validTimezone, type Couple, type Nook, type Post, type Profile } from './lib'
+import { AuthScreen, PasswordPanel, PasswordRecoveryScreen, authErrorText } from './Auth'
+import { Brand } from './Brand'
 
 type Page = 'today' | 'keepsakes' | 'mixtape' | 'play' | 'settings'
 type Action = (work: () => Promise<unknown>, message?: string, onError?: (message: string) => void) => Promise<boolean>
@@ -10,6 +12,7 @@ const navigation = [{ id: 'today', label: 'Today', icon: Home }, { id: 'keepsake
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [booting, setBooting] = useState(true)
+  const [passwordRecovery, setPasswordRecovery] = useState(initialPasswordRecovery)
   const [nook, setNook] = useState<Nook | null>(null)
   const [page, setPage] = useState<Page>('today')
   const [busy, setBusy] = useState(false)
@@ -24,9 +27,27 @@ export default function App() {
 
   useEffect(() => {
     if (!supabase) { setBooting(false); return }
-    supabase.auth.getSession().then(({ data, error }) => { if (error) setNotice({ text: error.message, error: true }); setSession(data.session); setBooting(false) })
-    const { data } = supabase.auth.onAuthStateChange((_event, value) => { setSession(value); if (!value) { activeUser.current = null; setNook(null); setInvite(null); setPage('today') } })
-    return () => data.subscription.unsubscribe()
+    let mounted = true
+    const { data } = supabase.auth.onAuthStateChange((event, value) => {
+      setSession(value)
+      if (event === 'PASSWORD_RECOVERY') {
+        setPasswordRecovery(true)
+        window.history.replaceState(null, '', `${window.location.pathname}#set-password`)
+      }
+      if (!value) {
+        activeUser.current = null; setNook(null); setInvite(null); setCompose(null); setPage('today')
+        if (event === 'SIGNED_OUT') {
+          setPasswordRecovery(false)
+          window.history.replaceState(null, '', window.location.pathname)
+        }
+      }
+    })
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!mounted) return
+      if (error) setNotice({ text: authErrorText(error), error: true })
+      setSession(data.session); setBooting(false)
+    }).catch(error => { if (mounted) { setNotice({ text: authErrorText(error), error: true }); setBooting(false) } })
+    return () => { mounted = false; data.subscription.unsubscribe() }
   }, [])
   const refresh = useCallback(async () => {
     if (!session) return
@@ -37,9 +58,9 @@ export default function App() {
   }, [session?.user.id, postLimit])
   useEffect(() => {
     activeUser.current = session?.user.id || null
-    if (!session) return
+    if (!session || passwordRecovery) return
     void refresh().catch(error => setNotice({ text: errorText(error), error: true }))
-  }, [session?.user.id, refresh])
+  }, [session?.user.id, refresh, passwordRecovery])
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 15000)
     return () => clearInterval(timer)
@@ -76,16 +97,21 @@ export default function App() {
   }
 
   if (booting) return <div className="full-center"><LoaderCircle className="spin" aria-label="Opening Our Nook" /></div>
-  if (!session) return <AuthScreen />
-  if (!nook) return <div className="full-center"><Brand /><p>{notice?.text || 'Opening your little corner…'}</p><button className="button" onClick={() => void act(refresh)}>Try again</button><button className="text-button" onClick={() => void db().auth.signOut()}>Sign out</button></div>
-  if (!nook.couple) return <div className="onboarding-page"><Brand />{notice && <Notice notice={notice} close={() => setNotice(null)} />}<Onboarding profile={nook.profile} act={act} busy={busy} joined={() => setPage('today')} invite={setInvite} /><button className="text-button" onClick={() => void act(() => db().auth.signOut())}><LogOut /> Sign out</button></div>
+  if (!session) return <AuthScreen initialError={notice?.error ? notice.text : initialAuthError} />
+  if (passwordRecovery) return <PasswordRecoveryScreen email={session.user.email} onSaved={() => {
+    setPasswordRecovery(false)
+    window.history.replaceState(null, '', window.location.pathname)
+    setNotice({ text: 'Password saved. Next time, sign in with your email and password.', error: false })
+  }} />
+  if (!nook) return <div className="full-center"><Brand /><p>{notice?.text || 'Opening your little corner…'}</p><button className="button" onClick={() => void act(refresh)}>Try again</button><button className="text-button" onClick={() => void signOut()}>Sign out</button></div>
+  if (!nook.couple) return <div className="onboarding-page"><Brand />{notice && <Notice notice={notice} close={() => setNotice(null)} />}<Onboarding profile={nook.profile} act={act} busy={busy} joined={() => setPage('today')} invite={setInvite} /><PasswordPanel email={session.user.email} /><button className="text-button" onClick={() => void act(() => signOut())}><LogOut /> Sign out</button></div>
 
   const partner = nook.people.find(p => p.id !== nook.profile.id)
   const title = { today: 'A little time for us.', keepsakes: 'The little things, kept.', mixtape: 'Sounds like us.', play: 'Your move, sweetheart.', settings: 'Make yourselves at home.' }[page]
   return <div className="app-shell">
     <aside className="sidebar"><Brand /><nav aria-label="Main navigation">{navigation.map(item => <button key={item.id} className={page === item.id ? 'nav-item active' : 'nav-item'} aria-current={page === item.id ? 'page' : undefined} onClick={() => { setPage(item.id); setNotice(null) }}><item.icon /><span>{item.label}</span></button>)}</nav><div className="sidebar-bottom"><div className="small-label"><ShieldCheck /> Private space for two</div><button className="account-button" onClick={() => setPage('settings')}><span className="avatar">{nook.profile.avatar}</span><span>{nook.profile.display_name}<small>{nook.profile.city || 'Your corner of the world'}</small></span></button></div></aside>
     <div className="workspace">
-      <header className="topbar"><div className="mobile-brand"><Brand /></div><span className="space-name">{nook.couple.title}</span><span className="top-date">{localDay(nook.profile, now)}</span><button className="icon-button" aria-label="Sign out" onClick={() => void act(() => db().auth.signOut())}><LogOut /></button></header>
+      <header className="topbar"><div className="mobile-brand"><Brand /></div><span className="space-name">{nook.couple.title}</span><span className="top-date">{localDay(nook.profile, now)}</span><button className="icon-button" aria-label="Sign out" onClick={() => void act(() => signOut())}><LogOut /></button></header>
       <main>
         <div className="page-heading"><div><p className="eyebrow">{page === 'today' ? `HELLO, ${nook.profile.display_name.toLocaleUpperCase()}` : navigation.find(n => n.id === page)?.label.toUpperCase()}</p><h1>{title}</h1></div>{['today','keepsakes','mixtape'].includes(page) && <button className="button" onClick={() => setCompose(page === 'mixtape' ? 'song' : 'note')}><Plus /><span>{page === 'mixtape' ? 'Add music' : 'Leave something'}</span></button>}</div>
         {notice && <Notice notice={notice} close={() => setNotice(null)} />}
@@ -111,7 +137,7 @@ export default function App() {
           {nook.posts.length >= postLimit && <button className="button secondary load-more" onClick={() => setPostLimit(n => n + 60)}>Load older songs</button>}
         </>}
         {page === 'play' && <GamePanel nook={nook} act={act} busy={busy} />}
-        {page === 'settings' && <div className="settings-grid"><section className="panel"><h2>Your corner</h2><ProfileForm profile={nook.profile} act={act} busy={busy} /></section><div><section className="panel"><h2>Your shared space</h2><CoupleForm couple={nook.couple} act={act} busy={busy} />{!partner && <button className="text-button" disabled={busy} onClick={makeInvite}><KeyRound /> Create a fresh partner code</button>}</section><section className="panel telegram-panel"><h2><Send /> Telegram pocket inbox</h2><TelegramConnect act={act} busy={busy} /></section><section className="panel install-panel"><h2>Keep us close</h2><p>On iPhone, use your browser’s Share menu, then Add to Home Screen. On Android, use Install app or Add to Home Screen in the browser menu.</p></section></div></div>}
+        {page === 'settings' && <div className="settings-grid"><section className="panel"><h2>Your corner</h2><ProfileForm profile={nook.profile} act={act} busy={busy} /></section><div><section className="panel"><h2>Your shared space</h2><CoupleForm couple={nook.couple} act={act} busy={busy} />{!partner && <button className="text-button" disabled={busy} onClick={makeInvite}><KeyRound /> Create a fresh partner code</button>}</section><PasswordPanel email={session.user.email} /><section className="panel telegram-panel"><h2><Send /> Telegram pocket inbox</h2><TelegramConnect act={act} busy={busy} /></section><section className="panel install-panel"><h2>Keep us close</h2><p>On iPhone, use your browser’s Share menu, then Add to Home Screen. On Android, use Install app or Add to Home Screen in the browser menu.</p></section></div></div>}
       </main>
     </div>
     <nav className="mobile-nav" aria-label="Mobile navigation">{navigation.map(item => <button key={item.id} className={page === item.id ? 'active' : ''} aria-current={page === item.id ? 'page' : undefined} onClick={() => setPage(item.id)}><item.icon /><span>{item.label}</span></button>)}</nav>
@@ -119,19 +145,8 @@ export default function App() {
   </div>
 }
 
-function Brand() { return <div className="brand"><span className="brand-mark"><Heart fill="currentColor" /></span><span>our nook<span className="brand-dot">.</span></span></div> }
 function Notice({ notice, close }: { notice: { text: string; error: boolean }; close: () => void }) { return <div className={`notice ${notice.error ? 'error' : ''}`} role={notice.error ? 'alert' : 'status'}><span>{notice.text}</span><button className="icon-button" aria-label="Dismiss message" onClick={close}><X /></button></div> }
 function Empty({ icon, title, text, action }: { icon: ReactNode; title: string; text: string; action?: ReactNode }) { return <div className="empty-state"><span className="empty-icon">{icon}</span><h2>{title}</h2><p>{text}</p>{action}</div> }
-
-function AuthScreen() {
-  const [email, setEmail] = useState(''); const [busy, setBusy] = useState(false); const [message, setMessage] = useState(''); const [error, setError] = useState(''); const [sent, setSent] = useState(false)
-  async function submit(event: FormEvent) {
-    event.preventDefault(); setBusy(true); setError('')
-    try { const { error: e } = await db().auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: new URL('.', window.location.href).href } }); if (e) throw e; setMessage('Your sign-in link is on its way. Open the email to come home.'); setSent(true) }
-    catch (e) { setError(errorText(e)) } finally { setBusy(false) }
-  }
-  return <div className="auth-page"><div className="auth-story"><Brand /><div><p className="eyebrow">A PRIVATE PLACE FOR TWO</p><h1>All the little things.<br /><em>All in one place.</em></h1><p>A song that sounds like them. A photo of your day.<br />A little love, left for later.</p></div><span className="auth-footer"><HeartHandshake /> A little closer, wherever you are.</span></div><div className="auth-form-wrap"><div className="auth-form"><span className="form-kicker"><KeyRound /></span><h2>Come on in.</h2><p>Sign in with your email, then create a nook or join your partner with their invitation code.</p>{configured ? <form onSubmit={submit}><label>Email address<input type="email" autoComplete="email" required value={email} onChange={e => { setEmail(e.target.value); setSent(false) }} placeholder="you@example.com" /></label><button className="button full" disabled={busy || sent}>{busy ? <LoaderCircle className="spin" /> : <Mail />}{sent ? 'Check your inbox' : 'Email me a sign-in link'}</button>{sent && <button type="button" className="text-button" onClick={() => { setSent(false); setMessage('') }}>Use another email or try again</button>}<small>Your personal sign-in link and your shared partner code are separate.</small></form> : <div className="setup-message"><Sparkles /><strong>Our Nook is getting ready.</strong><p>Sign-in will open once setup is complete.</p></div>}{message && <p className="form-message" role="status">{message}</p>}{error && <p className="form-error" role="alert">{error}</p>}</div></div></div>
-}
 
 function ProfileForm({ profile, act, busy, after }: { profile: Profile; act: Action; busy: boolean; after?: () => void }) {
   const [form, setForm] = useState({ ...profile, timezone: profile.display_name === 'You' ? deviceTimezone() : profile.timezone })

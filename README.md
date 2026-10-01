@@ -2,11 +2,13 @@
 
 A cozy, private web app for any couple: little notes, photos, music links, two local clocks, and a game you can play across time zones. Install the same web app on iPhone or Android.
 
-**Status:** the database is deployed to the existing **our nook** Supabase project in Singapore, and its publishable frontend configuration is saved in `deployment/production.json`. Live SQL access checks passed. Email authentication and confirmation are enabled; anonymous sign-in is disabled. GitHub Actions builds and checks the app before publishing `main` to GitHub Pages. **Custom SMTP is still required before arbitrary email addresses can sign in.** The optional Telegram bot also needs its own credentials.
+**Website:** https://arunviswanathan91.github.io/our-nook/
+
+**Status:** the database is deployed to the existing **our nook** Supabase project in Singapore, and its publishable frontend configuration is saved in `deployment/production.json`. Live SQL access checks passed. Email/password sign-in is the default; email confirmation remains enabled and anonymous sign-in is disabled. GitHub Actions builds and checks the app before publishing `main` to GitHub Pages. **Password sign-in and session refresh do not send emails. Custom SMTP is still required for reliable new-account confirmation, first-password setup, and password recovery for arbitrary email addresses.** The optional Telegram bot also needs its own credentials.
 
 ## Access by partner code
 
-1. Each person signs in with their own email magic link.
+1. Each person creates an account, confirms their email once, and signs in with their own email and password.
 2. One person creates a nook and generates a partner invitation code.
 3. The other signs in, chooses **I have a code**, and enters it.
 
@@ -14,9 +16,19 @@ A nook has at most **two members**. Codes expire after **24 hours**, work **once
 
 Names, avatars, cities, countries, IANA time zones, clock format, status, and theme are editable. No couple, country, or time zone is hardcoded in production data. Each account belongs to one nook in this version.
 
+## Returning to an existing account
+
+- Already signed in: open **Our space → Password & sign-in → Set or change password**. The same option is available before creating/joining a nook.
+- Used an email link previously and now signed out: choose **Set or reset password** on the login screen, enter the **same email**, and use the setup email to choose a password. Do not create another account for the same nook.
+- Later visits: the app restores the saved session and refreshes expired access tokens. After an explicit sign-out, use the email/password form without requesting another email. Sign-out ends the current device's session, including its tabs, while other devices keep their sessions.
+- Password recovery requires an authenticated reset-link session. The password form survives a refresh, and setting a password keeps the same account ID, nook, and partner membership. Passwords are handled by Supabase Auth; they are not written to profile tables or browser storage by the app.
+- The optional **Use an email link** fallback is restricted to existing accounts. Recovery emails and new-account confirmations still depend on the project's email sender and its limits.
+
+Use at least 12 characters for new passwords. Browser/private-mode storage clearing, revoked sessions, or other security events can require sign-in again. The project currently has no forced session lifetime/inactivity timeout; token expiry stays at 3600 seconds with normal refresh-token protections. Google OAuth is not configured in this release.
+
 ## Included
 
-- Email magic-link sign-in using Supabase Auth.
+- Email/password sign-in, password setup/recovery, persistent sessions, and an optional email-link fallback using Supabase Auth.
 - Private couple spaces with row-level security, including private photo storage.
 - Notes, JPG/PNG/WebP photos up to 10 MB, hugs, and shared song/playlist links.
 - Spotify, Apple Music, YouTube, SoundCloud, and Bandcamp links. This saves links; it does not synchronize playback or edit provider playlists.
@@ -66,7 +78,7 @@ In the Supabase dashboard:
 
 1. Enable email authentication and email confirmation; keep anonymous sign-in disabled.
 2. Set **Auth → URL Configuration → Site URL** to the exact deployed app URL. Allow that URL, including its trailing slash/path, as a redirect URL. For development, allow `http://localhost:5173/` and `http://127.0.0.1:5173/`.
-3. Configure your own SMTP sender for real users. The built-in development sender is restricted and is not sufficient for an app open to arbitrary email addresses. The app uses the default magic-link flow, so no OTP-template customization is needed.
+3. Configure your own SMTP sender for real users. The built-in development sender is restricted and is not sufficient for confirmation/reset emails to arbitrary addresses. The app uses Supabase's default email confirmation, reset-password, and magic-link templates; no template customization is needed. Password sign-in itself sends no email.
 4. Keep `nook_private` out of Data API exposed schemas. Keep the `nook-memories` bucket private.
 5. Run Supabase's security/performance advisors and perform the live checks below.
 
@@ -134,9 +146,9 @@ deno check supabase/functions/telegram-webhook/index.ts
 
 - Database tests run the actual migration in PGlite with Supabase auth/storage fixtures. They exercise row-level access, invitation expiry/rotation/reuse, membership limits, rate limits, storage isolation, game turns, and Telegram authorization.
 - Webhook tests exercise sender verification, unlinked accounts, music allowlisting, duplicate photo cleanup, and size limits.
-- Browser tests use a mocked Supabase transport, including valid/invalid join flows and layouts at 320, 390, 768, and 1440 pixels. These tests do **not** prove real email delivery, deployed Storage, Realtime, or Telegram connectivity.
+- Browser tests use the real Supabase client with a mocked transport. They cover password sign-in, invalid credentials, saved sessions across reloads/tabs, expired-token refresh, device sign-out, confirmation, password setup/recovery, failed updates, email rate-limit messages, partner joining, and phone/desktop layouts. They do **not** prove real email delivery, deployed password changes, Storage, Realtime, or Telegram connectivity.
 
-Before opening the live app to others, test with two real accounts and a third outsider: email sign-in, code join, photo upload/read/delete, alternating moves on two devices, sign-out/sign-in, and Telegram link/save/disconnect. Verify the outsider cannot read either partner's rows or photos. Check the installed app on physical iPhone and Android devices.
+Before opening the live app to others, test with two real accounts and a third outsider: confirmation, first-password setup, password sign-in, recovery, code join, photo upload/read/delete, alternating moves on two devices, session persistence after closing/reopening, and Telegram link/save/disconnect. Verify the outsider cannot read either partner's rows or photos. Check the installed app on physical iPhone and Android devices. The existing-account owner must choose their own password; no real account password is created or changed by deployment.
 
 ## Live database verification
 
@@ -152,6 +164,8 @@ The first version does not include partner replacement, account deletion/export 
 
 ## References
 
+- [Supabase password-based authentication](https://supabase.com/docs/guides/auth/passwords)
+- [Supabase sessions](https://supabase.com/docs/guides/auth/sessions)
 - [Supabase passwordless email sign-in](https://supabase.com/docs/guides/auth/auth-email-passwordless)
 - [Supabase production SMTP](https://supabase.com/docs/guides/auth/auth-smtp)
 - [Supabase storage access control](https://supabase.com/docs/guides/storage/security/access-control)

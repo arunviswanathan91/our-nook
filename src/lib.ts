@@ -1,9 +1,19 @@
 import { createClient } from '@supabase/supabase-js'
 
 export const configured = Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY)
-export const supabase = configured ? createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) : null
+// Capture callback intent before the SDK consumes and clears its URL fragment.
+const callback = new URLSearchParams(window.location.hash.slice(1))
+export const initialPasswordRecovery = callback.get('type') === 'recovery' || window.location.hash === '#set-password'
+export const initialAuthError = callback.has('error') || callback.has('error_description') ? 'That email link is invalid or has expired. Request a new one, or sign in with your password.' : ''
+export const supabase = configured ? createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+}) : null
 export const botUsername = (import.meta.env.VITE_TELEGRAM_BOT_USERNAME || '').replace(/^@/, '')
 export function db() { if (!supabase) throw new Error('Our Nook is still being set up. Please try again later.'); return supabase }
+export async function signOut() {
+  const { error } = await db().auth.signOut({ scope: 'local' })
+  if (error) throw error
+}
 export type Profile = { id: string; display_name: string; avatar: string; city: string; country: string; timezone: string; time_format: '12' | '24'; theme: 'rose' | 'night'; status: string }
 export type Couple = { id: string; title: string; created_by: string; anniversary: string | null; next_visit: string | null }
 export type Post = { id: string; couple_id: string; author_id: string; kind: 'note' | 'photo' | 'song' | 'hug'; body: string; link_url: string | null; storage_path: string | null; created_at: string; image_url?: string }
