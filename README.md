@@ -2,7 +2,7 @@
 
 A cozy, private web app for any couple: little notes, photos, music links, two local clocks, and a game you can play across time zones. Install the same web app on iPhone or Android.
 
-**Status:** the database is deployed to the existing **our nook** Supabase project in Singapore, and its publishable frontend configuration is saved in `deployment/production.json`. Live SQL access checks passed. Dashboard authentication settings, email delivery, web hosting, and the optional Telegram bot still need to be completed before the app can be used end to end.
+**Status:** the database is deployed to the existing **our nook** Supabase project in Singapore, and its publishable frontend configuration is saved in `deployment/production.json`. Live SQL access checks passed. Email authentication and confirmation are enabled; anonymous sign-in is disabled. GitHub Actions builds and checks the app before publishing `main` to GitHub Pages. **Custom SMTP is still required before arbitrary email addresses can sign in.** The optional Telegram bot also needs its own credentials.
 
 ## Access by partner code
 
@@ -73,6 +73,8 @@ In the Supabase dashboard:
 For a local Supabase stack, Docker is required. Run `npx supabase start`, then `npx supabase db reset`; use the local URL/key and Inbucket email viewer reported by the CLI. The seed file is intentionally empty.
 
 ## Hosting
+
+This repository uses GitHub Pages with **Settings → Pages → Source → GitHub Actions**. The validation workflow publishes only the verified `dist/` artifact from `main`; pull requests and other branches cannot deploy. Its deployment job uses the `github-pages` environment and the standard short-lived GitHub Actions token. No personal access token or hosting secret is needed. Each deployment's exact website URL appears in the workflow and repository Pages settings.
 
 Build the frontend:
 
