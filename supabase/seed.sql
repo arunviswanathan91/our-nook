@@ -1,0 +1,1 @@
+-- Intentionally empty: real profiles and private spaces are created after login.
