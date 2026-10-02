@@ -10,13 +10,16 @@ export const supabase = configured ? createClient(import.meta.env.VITE_SUPABASE_
 }) : null
 export const botUsername = (import.meta.env.VITE_TELEGRAM_BOT_USERNAME || '').replace(/^@/, '')
 export function db() { if (!supabase) throw new Error('Our Nook is still being set up. Please try again later.'); return supabase }
+const mediaCache = new Map<string,{url:string;expires:number}>()
+export function clearMediaCache() { mediaCache.clear() }
 export async function signOut() {
   const { error } = await db().auth.signOut({ scope: 'local' })
   if (error) throw error
+  clearMediaCache()
 }
-export type Profile = { id: string; display_name: string; avatar: string; city: string; country: string; timezone: string; time_format: '12' | '24'; theme: 'rose' | 'night'; status: string }
-export type Couple = { id: string; title: string; created_by: string; anniversary: string | null; next_visit: string | null }
-export type Post = { id: string; couple_id: string; author_id: string; kind: 'note' | 'photo' | 'song' | 'hug'; body: string; link_url: string | null; storage_path: string | null; created_at: string; image_url?: string }
+export type Profile = { id: string; display_name: string; avatar: string; city: string; country: string; timezone: string; time_format: '12' | '24'; theme: 'rose' | 'night'; status: string; pronouns?: string; haptics?: boolean; quiet_mode?: boolean }
+export type Couple = { id: string; title: string; created_by: string; anniversary: string | null; next_visit: string | null; ritual_timezone?: string }
+export type Post = { id: string; couple_id: string; author_id: string; kind: 'note' | 'photo' | 'song' | 'hug' | 'voice' | 'ambient' | 'doodle'; body: string; link_url: string | null; storage_path: string | null; created_at: string; image_url?: string; metadata?: { title?: string; artist?: string; collection?: string; duration?: number } }
 export type Game = { id: string; couple_id: string; player_x: string; player_o: string; board: string[]; turn_user: string | null; winner: string | null; status: 'playing' | 'won' | 'draw'; created_at: string }
 export type Nook = { profile: Profile; couple: Couple | null; people: Profile[]; posts: Post[]; game: Game | null }
 export function deviceTimezone() { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' }
@@ -52,25 +55,39 @@ export async function loadNook(userId: string, limit = 60): Promise<Nook> {
   if (e) throw e
   const withImages = await Promise.all((posts || []).map(async (post: Post) => {
     if (!post.storage_path) return post
+    const cached=mediaCache.get(post.storage_path)
+    if(cached && cached.expires>Date.now()+30000) return {...post,image_url:cached.url}
     const { data } = await client.storage.from('nook-memories').createSignedUrl(post.storage_path, 300)
+    if(data?.signedUrl)mediaCache.set(post.storage_path,{url:data.signedUrl,expires:Date.now()+300000})
     return { ...post, image_url: data?.signedUrl }
   }))
   return { profile, couple, people: people || [], posts: withImages, game }
 }
-export async function createPost(nook: Nook, kind: Post['kind'], body = '', link_url: string | null = null, file?: File) {
+export const audioExtensions: Record<string,string> = { 'audio/webm':'webm','audio/mp4':'mp4','audio/ogg':'ogg','audio/mpeg':'mp3','audio/wav':'wav','audio/x-m4a':'m4a' }
+export async function uploadMedia(nook: Nook, file: File, bucket = 'nook-memories') {
+  if (!nook.couple) throw new Error('Create or join a nook first.')
+  const mime = file.type.split(';')[0]
+  const extensions: Record<string,string> = { 'image/jpeg':'jpg', 'image/png':'png', 'image/webp':'webp', ...audioExtensions }
+  if (!extensions[mime]) throw new Error('Choose a JPG, PNG, WebP, MP3, M4A, WebM, Ogg, or WAV file.')
+  if (file.size > 10 * 1024 * 1024) throw new Error('Choose a file smaller than 10 MB.')
+  const path = `${nook.couple.id}/${nook.profile.id}/${crypto.randomUUID()}.${extensions[mime]}`
+  const { error } = await db().storage.from(bucket).upload(path, file, { contentType:mime,upsert:false })
+  if (error) throw error
+  return path
+}
+export async function createPost(nook: Nook, kind: Post['kind'], body = '', link_url: string | null = null, file?: File, metadata: Post['metadata'] = {}) {
   if (!nook.couple) throw new Error('Create or join a nook first.')
   let storage_path: string | null = null
   if (file) {
-    const extensions: Record<string,string> = { 'image/jpeg':'jpg', 'image/png':'png', 'image/webp':'webp' }
-    if (!extensions[file.type]) throw new Error('Choose a JPG, PNG, or WebP photo. Convert HEIC photos to JPG first.')
-    if (file.size > 10 * 1024 * 1024) throw new Error('Choose a photo smaller than 10 MB.')
-    storage_path = `${nook.couple.id}/${nook.profile.id}/${crypto.randomUUID()}.${extensions[file.type]}`
-    const { error } = await db().storage.from('nook-memories').upload(storage_path, file, { contentType: file.type, upsert: false })
-    if (error) throw error
+    if (['photo','doodle'].includes(kind) && !['image/jpeg','image/png','image/webp'].includes(file.type)) throw new Error('Choose a JPG, PNG, or WebP photo. Convert HEIC photos to JPG first.')
+    if (['voice','ambient'].includes(kind) && !audioExtensions[file.type.split(';')[0]]) throw new Error('Choose an audio recording.')
+    storage_path = await uploadMedia(nook,file)
   }
-  const { error } = await db().from('nook_posts').insert({ couple_id: nook.couple.id, author_id: nook.profile.id, kind, body, link_url, storage_path })
+  const id = crypto.randomUUID()
+  const { error } = await db().from('nook_posts').insert({ id,couple_id: nook.couple.id, author_id: nook.profile.id, kind, body, link_url, storage_path, metadata })
   if (error) {
     if (storage_path) await db().storage.from('nook-memories').remove([storage_path])
     throw error
   }
+  return id
 }

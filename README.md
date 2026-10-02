@@ -1,6 +1,6 @@
 # Our Nook
 
-A cozy, private web app for any couple: little notes, photos, music links, two local clocks, and a game you can play across time zones. Install the same web app on iPhone or Android.
+A cozy, private web app for any couple: shared touch, letters, photos, music, recorded whispers, daily questions, and little games across time zones. Install the same web app on iPhone or Android.
 
 **Website:** https://arunviswanathan91.github.io/our-nook/
 
@@ -28,15 +28,20 @@ Use at least 12 characters for new passwords. Browser/private-mode storage clear
 
 ## Included
 
-- Email/password sign-in, password setup/recovery, persistent sessions, and an optional email-link fallback using Supabase Auth.
-- Private couple spaces with row-level security, including private photo storage.
-- Notes, JPG/PNG/WebP photos up to 10 MB, hugs, and shared song/playlist links.
-- Spotify, Apple Music, YouTube, SoundCloud, and Bandcamp links. This saves links; it does not synchronize playback or edit provider playlists.
-- Two local clocks, editable profiles, rose and night themes, and shared dates/settings.
-- Persistent, turn-based tic-tac-toe with hearts, validated by the database.
-- Realtime post/game updates with a focus/polling fallback.
-- Installable PWA with an offline notice. Saving and reading shared content require internet; private API responses and photos are not cached by the service worker.
+The Dearest redesign preserves the original rose, cream, lilac and mulberry palette.
+
+- **Together:** editable local clocks and app presence, held thumb touch, taps/kisses/waves/hugs, mug clinks and glimmers, a shared plant, breathing rhythm, and shared dates.
+- **Scrapbook:** private photographs, notes, drawings, recorded whispers/ambience, hearts, search and filters, on-this-day memories, sealed letters and reunion capsules.
+- **Mixtape:** song/playlist dedications, cassette collections, a daily song swap, supported provider embeds, shared listening cues, and shared play/pause/seek for app recordings after both people join.
+- **Parlour:** daily/custom questions whose answers reveal only after both reply, either-or choices, guess-a-sound, tic-tac-toe, shared drawing with keyboard alternatives, and scratch/tap surprises.
+- **Our space:** individual names, pronouns, avatars, cities/countries/time zones, clock format, rose/night theme, status, quiet mode and haptics; shared dates and a configurable day boundary.
+- Email/password sign-in, password setup/recovery, persistent sessions, and optional email-link fallback using Supabase Auth. Existing accounts and pairing remain valid.
+- Private couple spaces with row-level security and private media buckets. Sealed letter bodies and unrevealed answers stay in an unexposed database schema; timed audio is blocked by Storage policies too.
+- Realtime updates plus foreground reconciliation after missed events or sleeping tabs.
+- Installable PWA with an offline notice. Shared content needs internet; the service worker does not cache private API responses or media.
 - Optional Telegram inbox with temporary account-link tokens, authenticated webhooks, and deduplicated saves.
+
+Haptics use optional browser vibration with visual feedback on every device. iPhone web browsers do not promise physical vibration. Microphone recording needs permission and browser support; audio upload remains available. In-app recording stops after one minute or when the page is hidden. Photos and recordings are limited to 10 MB. External music has a shared start cue, not sample-accurate synchronized provider playback or provider playlist editing. Presence describes recent activity in this app; skies are decorative.
 
 ## Run locally
 
@@ -61,9 +66,9 @@ Use a **publishable key** in the frontend. Never put a Supabase secret/service-r
 
 ## Supabase setup
 
-The existing **our nook** project (`lqdkyarlihfprvoqmfdo`) already has both migrations applied. Their repository timestamps match Supabase’s recorded deployment history. Do not reapply the initial migration manually to this project. The steps below are for another fresh deployment.
+The existing **our nook** project (`lqdkyarlihfprvoqmfdo`) uses the migrations in this repository. Their repository timestamps match Supabase’s recorded deployment history. Do not reapply the initial migration manually to this project. The steps below are for another fresh deployment.
 
-Use a new, dedicated Supabase project. This migration creates the application's tables, functions, indexes, policies, private photo bucket, and realtime publication entries. It assumes Supabase's standard `auth` and `storage` schemas.
+Use a new, dedicated Supabase project. This migration creates the application's tables, functions, indexes, policies, private media buckets, and realtime publication entries. It assumes Supabase's standard `auth` and `storage` schemas.
 
 ```sh
 npx supabase login
@@ -72,14 +77,14 @@ npx supabase db push --dry-run
 npx supabase db push
 ```
 
-The CLI applies both files in `supabase/migrations/` in timestamp order. Alternatively, apply both SQL files once, in that order, in a new project's SQL editor, then reconcile migration history before later CLI pushes.
+The CLI applies all files in `supabase/migrations/` in timestamp order. Alternatively, apply all SQL files once, in that order, in a new project's SQL editor, then reconcile migration history before later CLI pushes.
 
 In the Supabase dashboard:
 
 1. Enable email authentication and email confirmation; keep anonymous sign-in disabled.
 2. Set **Auth → URL Configuration → Site URL** to the exact deployed app URL. Allow that URL, including its trailing slash/path, as a redirect URL. For development, allow `http://localhost:5173/` and `http://127.0.0.1:5173/`.
 3. Configure your own SMTP sender for real users. The built-in development sender is restricted and is not sufficient for confirmation/reset emails to arbitrary addresses. The app uses Supabase's default email confirmation, reset-password, and magic-link templates; no template customization is needed. Password sign-in itself sends no email.
-4. Keep `nook_private` out of Data API exposed schemas. Keep the `nook-memories` bucket private.
+4. Keep `nook_private` out of Data API exposed schemas. Keep the `nook-memories` and `nook-envelopes` buckets private.
 5. Run Supabase's security/performance advisors and perform the live checks below.
 
 For a local Supabase stack, Docker is required. Run `npx supabase start`, then `npx supabase db reset`; use the local URL/key and Inbucket email viewer reported by the CLI. The seed file is intentionally empty.
@@ -144,23 +149,23 @@ npm run test:ui
 deno check supabase/functions/telegram-webhook/index.ts
 ```
 
-- Database tests run the actual migration in PGlite with Supabase auth/storage fixtures. They exercise row-level access, invitation expiry/rotation/reuse, membership limits, rate limits, storage isolation, game turns, and Telegram authorization.
+- Database tests run the actual migration in PGlite with Supabase auth/storage fixtures. They exercise row-level access, invitation expiry/rotation/reuse, membership limits, rate limits, storage isolation, game turns, Telegram authorization, two-answer privacy, timed letter/audio access, once-daily watering, touch expiry, signal throttling, drawing validation, and shared playback boundaries.
 - Webhook tests exercise sender verification, unlinked accounts, music allowlisting, duplicate photo cleanup, and size limits.
-- Browser tests use the real Supabase client with a mocked transport. They cover password sign-in, invalid credentials, saved sessions across reloads/tabs, expired-token refresh, device sign-out, confirmation, password setup/recovery, failed updates, email rate-limit messages, partner joining, and phone/desktop layouts. They do **not** prove real email delivery, deployed password changes, Storage, Realtime, or Telegram connectivity.
+- Browser tests use the real Supabase client with a mocked transport. They cover password sign-in, invalid credentials, saved sessions across reloads/tabs, expired-token refresh, device sign-out, confirmation, password setup/recovery, failed updates, email rate-limit messages, partner joining, and phone/desktop layouts. Two isolated browser accounts also exercise Realtime protocol delivery for touch, signals, two-answer reveals, shared drawing, and actual HTML audio playback controls, using a mocked transport. These tests do **not** prove real email delivery, deployed password changes, live Storage/Realtime connectivity, or Telegram connectivity.
 
 Before opening the live app to others, test with two real accounts and a third outsider: confirmation, first-password setup, password sign-in, recovery, code join, photo upload/read/delete, alternating moves on two devices, session persistence after closing/reopening, and Telegram link/save/disconnect. Verify the outsider cannot read either partner's rows or photos. Check the installed app on physical iPhone and Android devices. The existing-account owner must choose their own password; no real account password is created or changed by deployment.
 
 ## Live database verification
 
-The migration was applied to `lqdkyarlihfprvoqmfdo`, including private photo Storage and realtime publications. `supabase/tests/live_access_smoke.sql` verifies partner joining, shared reads, game moves, outsider isolation, two-person capacity, and anonymous denial inside a transaction. It rolls back every synthetic row and sends no emails. The live database was checked afterward: zero Auth users, couple spaces, or posts remained.
+The migration was applied to `lqdkyarlihfprvoqmfdo`, including private photo Storage and realtime publications. `supabase/tests/live_access_smoke.sql` verifies partner joining, shared reads, game moves, outsider isolation, two-person capacity, and anonymous denial inside a transaction. It rolls back every synthetic row and sends no emails. The smoke test creates only synthetic accounts and rolls back the entire transaction; it preserves existing users and content. It also checks sealed question answers, timed envelope/audio permissions, watering, expiring touches, shared playback, and drawing isolation.
 
-Supabase’s advisors reported no security warnings or errors after setup. Five [RLS-without-policy informational notices](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy) are intentional for internal tables in the unexposed `nook_private` schema: clients have no direct table access, and only authorized functions access them. [Unused-index notices](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index) are expected for an empty app. The [unindexed-foreign-key findings](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys) were fixed by the second migration.
+After the Dearest upgrade, Supabase’s advisors report no database security warnings or missing foreign-key indexes. Auth still flags disabled [leaked-password protection](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection), which requires an eligible Pro-or-higher plan; the redesign does not change billing or Auth configuration. [RLS-without-policy informational notices](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy) are intentional for internal tables in the unexposed `nook_private` schema: clients have no direct table access, and only authorized functions access them. [Unused-index notices](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index) are expected for new or rarely used features. The [unindexed-foreign-key findings](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys) are covered by the indexing migrations.
 
 ## Design notes and current limits
 
 Privileged database functions live in `nook_private` with explicit authorization checks and fixed empty search paths; exposed RPC wrappers run as invokers. Frontend roles cannot directly write memberships or game state. Join and game mutations lock the relevant rows to serialize competing requests. Photos use short-lived signed URLs. This is access-controlled shared storage, not end-to-end encryption.
 
-The first version does not include partner replacement, account deletion/export UI, comments, push notifications, video, shared playback, or offline content sync. Shared anniversary/next-visit dates are saved in settings; there is no scheduled reminder service. Administrative deletion must remove dependent content/memberships and Storage objects before Auth users. If a file upload succeeds and its subsequent network request fails, an unused object can remain; clean up unreferenced objects as an operational task. Telegram deduplication records are retained to prevent replay.
+This version does not include partner replacement, account deletion/export UI, comments, push notifications, video, or offline content sync. Physical haptics and microphone formats vary by browser. Letters and conversation snapshots currently show the latest 100 entries; the current daily question is always included. Drawings support up to 500 active strokes; save the drawing before clearing the shared paper. Shared anniversary/next-visit dates are saved in settings; there is no scheduled reminder service. Administrative deletion must remove dependent content/memberships and Storage objects before Auth users. If a file upload succeeds and its subsequent network request fails, an unused object can remain; clean up unreferenced objects as an operational task. Telegram deduplication records are retained to prevent replay.
 
 ## References
 
@@ -170,3 +175,5 @@ The first version does not include partner replacement, account deletion/export 
 - [Supabase production SMTP](https://supabase.com/docs/guides/auth/auth-smtp)
 - [Supabase storage access control](https://supabase.com/docs/guides/storage/security/access-control)
 - [Telegram webhook API](https://core.telegram.org/bots/api#setwebhook)
+
+See [the design decisions and feature map](docs/design.md) for prototype synthesis and UI/UX Pro Max provenance.
