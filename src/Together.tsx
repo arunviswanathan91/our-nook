@@ -5,6 +5,7 @@ import { calendarDays, dayKey, feedback, localHour, stopFeedback, ago, type Sign
 import type { Shared } from './useShared'
 import type { Action } from './Base'
 import type { ComposeKind } from './Media'
+import { TouchSupport } from './HapticSettings'
 
 const signalWords: Record<SignalKind,string>={touch:'left a little warmth',tap:'sent a gentle tap',warmth:'sent some warmth',wave:'sent a little wave',kiss:'blew a kiss',clink:'clinked a mug with yours',glimmer:'left a star in your sky',hug:'sent a long-distance hug'}
 function PersonClock({profile,now,online}:{profile:Profile;now:Date;online:boolean}){
@@ -17,7 +18,7 @@ export function Horizons({nook,shared}:{nook:Nook;shared:Shared}) {
   return <section className="horizons" aria-label="Your two corners of the world"><div className="section-label"><Heart/> TWO PLACES, ONE LITTLE WORLD</div><div className="horizon-clocks"><PersonClock profile={nook.profile} now={new Date(shared.now)} online={online(nook.profile.id)}/><span className="horizon-thread" aria-hidden="true"><Heart/></span>{partner?<PersonClock profile={partner} now={new Date(shared.now)} online={online(partner.id)}/>:<div className="horizon-waiting"><Moon/><h3>A place for your person.</h3><p>Share your invitation code to bring them home.</p></div>}</div></section>
 }
 
-export function TouchPanel({nook,shared,act,compose}:{nook:Nook;shared:Shared;act:Action;compose:(kind:ComposeKind)=>void}) {
+export function TouchPanel({nook,shared,act,compose,settings}:{nook:Nook;shared:Shared;act:Action;compose:(kind:ComposeKind)=>void;settings:()=>void}) {
   const [holding,setHolding]=useState(false),[sending,setSending]=useState(false),[message,setMessage]=useState('')
   const holdingRef=useRef(false),timer=useRef<number|undefined>(undefined),queue=useRef(Promise.resolve())
   const partner=nook.people.find(p=>p.id!==nook.profile.id)
@@ -29,16 +30,16 @@ export function TouchPanel({nook,shared,act,compose}:{nook:Nook;shared:Shared;ac
   function end(){if(!holdingRef.current)return;holdingRef.current=false;setHolding(false);clearInterval(timer.current);pushHold(false);stopFeedback()}
   function start(){
     if(!partner||holdingRef.current||shared.loading)return
-    holdingRef.current=true;setHolding(true);setMessage('');feedback('warmth');pushHold(true)
-    void shared.send('touch').catch(()=>{})
+    holdingRef.current=true;setHolding(true);setMessage('');void feedback('warmth','hold');pushHold(true)
+    void shared.send('touch').catch(()=>{if(isMounted.current)setMessage('Your touch could not be sent. Try again when you are online.')})
     timer.current=window.setInterval(()=>{if(holdingRef.current)pushHold(true)},3000)
   }
   useEffect(()=>{isMounted.current=true;const hide=()=>{if(document.hidden)end()};document.addEventListener('visibilitychange',hide);return()=>{isMounted.current=false;document.removeEventListener('visibilitychange',hide);clearInterval(timer.current);if(holdingRef.current)void shared.hold(false).catch(()=>{});stopFeedback()}},[])
-  useEffect(()=>{if(both)feedback('touch')},[both])
+  useEffect(()=>{if(both)void feedback('touch','hold')},[both])
   async function send(kind:SignalKind){
     if(sending||!partner)return;setSending(true)
     const ok=await act(()=>shared.send(kind))
-    if(ok){feedback(kind);setMessage(`You ${signalWords[kind]}.`)}setSending(false)
+    if(ok){void feedback(kind,'sent');setMessage(`You ${signalWords[kind]}.`)}setSending(false)
   }
   const gestures=[{kind:'tap',label:'A tiny tap',icon:Touchpad},{kind:'kiss',label:'A kiss',icon:Heart},{kind:'wave',label:'A wave',icon:Waves},{kind:'hug',label:'A hug',icon:HeartHandshake}] as const
   return <section className={`touch-panel ${both?'touch-together':''} ${received?'touch-received':''}`}>
@@ -49,13 +50,14 @@ export function TouchPanel({nook,shared,act,compose}:{nook:Nook;shared:Shared;ac
     <p className="touch-response" role="status">{received?`${partner?.display_name||'Your person'} ${signalWords[received.kind]}.`:message||`${shared.data.live?.state.touch_count||0} little hellos, between you`}</p>
     <div className="gesture-row">{gestures.map(g=><button key={g.kind} className="gesture" data-haptic={g.kind} disabled={!partner||sending||shared.loading} onClick={()=>void send(g.kind)}><span><g.icon/></span>{g.label}</button>)}<button className="gesture" onClick={()=>compose('voice')}><span><Mic/></span>A whisper</button></div>
     <p className="touch-accessibility">Hold with touch, mouse, or the space key. The small buttons work with a single tap.</p>
+    <TouchSupport settings={settings}/>
   </section>
 }
 
 export function Balcony({nook,shared,act}:{nook:Nook;shared:Shared;act:Action}) {
   const [pending,setPending]=useState(false),[sent,setSent]=useState<SignalKind|null>(null)
   const partner=nook.people.find(p=>p.id!==nook.profile.id)
-  async function send(kind:SignalKind){if(pending)return;setPending(true);if(await act(()=>shared.send(kind))){setSent(kind);feedback(kind)}setPending(false)}
+  async function send(kind:SignalKind){if(pending)return;setPending(true);if(await act(()=>shared.send(kind))){setSent(kind);void feedback(kind,'sent')}setPending(false)}
   return <section className="balcony-panel panel"><div className="section-label"><Moon/> OUR SHARED SKY</div><div className={`balcony-scene ${sent==='glimmer'?'glimmered':''}`} aria-hidden="true"><div className="sky-half sky-rose"><span className="sky-moon"/><i className="star-dot s1"/><i className="star-dot s2"/></div><div className="sky-half sky-lilac"><span className="sky-sun"/><i className="star-dot s3"/></div><div className="sky-thread"/><span className="sky-caption">a little window into us</span><div className={`balcony-mugs ${sent==='clink'?'clinked':''}`}><span><Coffee/> yours</span><Heart/><span><Coffee/> theirs</span></div></div><div className="balcony-actions"><button className="button secondary" disabled={!partner||pending||shared.loading} data-haptic="clink" onClick={()=>void send('clink')}><Coffee/>Clink our mugs</button><button className="button secondary" disabled={!partner||pending||shared.loading} data-haptic="glimmer" onClick={()=>void send('glimmer')}><Star/>Send a glimmer</button></div><p className="muted" role="status">{sent==='clink'?'A little cheers, across the distance.':sent==='glimmer'?'Your star is on its way.':'Different windows. A moment we can share.'}</p></section>
 }
 

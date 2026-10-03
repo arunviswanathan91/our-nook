@@ -8,3 +8,7 @@ supabase/.temp/
 supabase/.branches/
 test-results/
 .DS_Store
+*.p12
+*.mobileprovision
+*.ipa
+*.xcarchive/

@@ -1,0 +1,35 @@
+name: Verify iPhone build
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Select an installed Xcode 26 release
+        run: |
+          python3 - <<'PY'
+          import glob, re, subprocess
+          candidates = glob.glob('/Applications/Xcode_26*.app/Contents/Developer')
+          if not candidates:
+              raise SystemExit('This Capacitor build requires Xcode 26; no matching runner installation was found.')
+          selected = max(candidates, key=lambda path: tuple(map(int, re.findall(r'\d+', path))))
+          subprocess.run(['sudo', 'xcode-select', '--switch', selected], check=True)
+          PY
+      - run: xcodebuild -version
+      - run: npm run ios:sync
+      - name: Compile the native app and haptic bridge without signing
+        run: npm run ios:build:unsigned
+      # This checks compilation only. An unsigned .app cannot be installed on
+      # an iPhone and must never be presented as a TestFlight/installation link.

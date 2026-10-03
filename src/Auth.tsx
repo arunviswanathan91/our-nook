@@ -2,11 +2,21 @@ import { useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { ArrowRight, Eye, EyeOff, HeartHandshake, KeyRound, LoaderCircle, LockKeyhole, Mail, Sparkles } from 'lucide-react'
 import { Brand } from './Brand'
 import { configured, db, errorText, signOut } from './lib'
+import { isNativeApp } from './haptics'
 
 type AuthMode = 'signin' | 'signup' | 'recover' | 'link'
 const MIN_PASSWORD_LENGTH = 12
 
-function authRedirect() { return new URL('.', window.location.href).href }
+function authRedirect() {
+  // Confirmation/reset emails open the existing HTTPS site. Password sign-in
+  // works inside the native app, without adding a custom auth redirect scheme.
+  if (isNativeApp()) {
+    const url = new URL(import.meta.env.VITE_PUBLIC_WEB_URL)
+    if (url.protocol !== 'https:') throw new Error('Email access needs the public HTTPS website configured for this app.')
+    return url.href
+  }
+  return new URL('.', window.location.href).href
+}
 
 export function authErrorText(error: unknown) {
   const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : ''
@@ -105,6 +115,7 @@ export function AuthScreen({ initialError = '' }: { initialError?: string }) {
         <button className="button full" disabled={busy || sent}>{busy ? <LoaderCircle className="spin" /> : mode === 'signin' ? <ArrowRight /> : <Mail />}{sent ? 'Check your inbox' : submitLabel}</button>
         {(mode === 'recover' || mode === 'link') && <small>This email is only for access to your account. Your partner invitation code is separate.</small>}
       </form>
+      {isNativeApp() && mode !== 'signin' && <p className="footnote">Email links open our website. After confirming your email or setting a password there, return here and sign in with your email and password.</p>}
       {error && <p className="form-error" role="alert">{error}</p>}
       {message && <p className="form-message" role="status">{message}</p>}
       <div className="auth-links">

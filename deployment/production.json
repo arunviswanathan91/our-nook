@@ -1,5 +1,6 @@
 {
   "supabaseUrl": "https://lqdkyarlihfprvoqmfdo.supabase.co",
   "supabasePublishableKey": "sb_publishable_qYNAnuyzhRyt6C7LFv2OSA_Hd-b35at",
-  "telegramBotUsername": ""
+  "telegramBotUsername": "",
+  "webAppUrl": "https://arunviswanathan91.github.io/our-nook/"
 }

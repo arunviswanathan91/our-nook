@@ -33,7 +33,7 @@ export function useShared(nook: Nook) {
     setOffset(Date.parse(live.server_now)-Date.now())
     if(seenSignals.current) {
       const fresh=live.signals.find(s=>s.author_id!==profile.current.id && !seenSignals.current!.has(s.id) && Date.parse(live.server_now)-Date.parse(s.created_at)<15000)
-      if(fresh) {setReceived(fresh);if(!profile.current.quiet_mode) feedback(fresh.kind)}
+      if(fresh) {setReceived(fresh);if(!profile.current.quiet_mode) void feedback(fresh.kind,'received')}
     }
     seenSignals.current=new Set(live.signals.map(s=>s.id))
     setData(previous=>({...previous,live}))
