@@ -1,8 +1,15 @@
 # Our Nook
 
-A cozy, private web app for any couple: shared touch, letters, photos, music, recorded whispers, daily questions, and little games across time zones. Install the same web app on iPhone or Android.
+A cozy, private app for any couple: shared touch, letters, photos, music, recorded whispers, daily questions, and little games across time zones. Use the web app on Android and iPhone, or build the native iPhone version for touch vibrations.
 
 **Website:** https://arunviswanathan91.github.io/our-nook/
+
+**Touch vibrations:** eight distinct rhythms, per-gesture pattern/off choices,
+local previews, pulse length, optional button feedback and native iPhone strength.
+Open **Our space → Touch & vibration**. Supported Android browsers can vibrate
+while open. iPhone Safari / Home Screen web apps cannot; the native Capacitor
+build uses Core Haptics and requires Apple signing/installation. Background
+notifications are not included. See [iPhone build and installation](docs/iphone.md).
 
 **Status:** the database is deployed to the existing **our nook** Supabase project in Singapore, and its publishable frontend configuration is saved in `deployment/production.json`. Live SQL access checks passed. Email/password sign-in is the default; email confirmation remains enabled and anonymous sign-in is disabled. GitHub Actions builds and checks the app before publishing `main` to GitHub Pages. **Password sign-in and session refresh do not send emails. Custom SMTP is still required for reliable new-account confirmation, first-password setup, and password recovery for arbitrary email addresses.** The optional Telegram bot also needs its own credentials.
 

@@ -1,0 +1,36 @@
+.touch-support { display: flex; align-items: flex-start; gap: 9px; text-align: left; padding: 12px 14px; margin-top: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--muted); font-size: .75rem; line-height: 1.65; }
+.touch-support > svg { width: 17px; height: 17px; flex: 0 0 17px; margin-top: 2px; }
+.touch-support p { margin: 0; }
+.touch-support .text-button { display: inline; min-height: 44px; font-size: inherit; padding: 10px 0; text-decoration: underline; text-underline-offset: 3px; }
+.touch-support.visual-only { border-color: color-mix(in srgb, var(--accent) 25%, var(--line)); }
+.haptic-settings { margin-top: 20px; }
+.haptic-title { display: flex; gap: 14px; align-items: center; margin-bottom: 15px; }
+.haptic-title .eyebrow { margin: 0 0 5px; font-size: .58rem; }
+.haptic-title h2 { margin: 0; }
+.haptic-settings > .muted { font-size: .82rem; line-height: 1.8; }
+.haptic-controls { margin: 20px 0 18px; }
+.haptic-controls label { min-width: 0; display: grid; gap: 8px; font-size: .82rem; }
+.haptic-settings select { width: 100%; min-width: 0; min-height: 44px; font-size: .82rem; }
+.haptic-settings .checkbox-label { font-size: .8rem; line-height: 1.6; min-height: 44px; }
+.haptic-muted { border-radius: 10px; padding: 12px; background: var(--rose); color: var(--ink); font-size: .8rem; line-height: 1.7; margin-top: 12px; }
+.haptic-pattern-list { border-top: 1px solid var(--line); margin-top: 20px; }
+.haptic-pattern-row { display: grid; grid-template-columns: minmax(95px, .8fr) minmax(90px, 1fr) 44px; gap: 9px; align-items: center; padding: 17px 0; border-bottom: 1px solid var(--line); }
+.haptic-pattern-name { display: flex; gap: 7px; align-items: center; font-size: .78rem; }
+.haptic-pattern-name svg { width: 14px; height: 14px; flex: 0 0 14px; color: var(--accent); }
+.haptic-pattern-choice { min-width: 0; }
+.haptic-preview { width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 50%; background: var(--rose); }
+.haptic-pattern-caption { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: .75rem; }
+.haptic-rhythm { display: inline-flex; flex: 0 0 85px; align-items: center; min-height: 12px; color: var(--accent); }
+.haptic-rhythm i { display: block; height: 6px; flex-shrink: 1; }
+.haptic-rhythm .pulse { background: var(--accent); border-radius: 4px; }
+.haptic-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; margin-top: 20px; }
+.haptic-actions .button, .haptic-actions .text-button { font-size: .75rem; }
+.haptic-feedback { min-height: 24px; font-size: .78rem; line-height: 1.7; margin: 12px 0; color: var(--accent); }
+@media (max-width: 400px) {
+  .haptic-pattern-row { grid-template-columns: minmax(0, 1fr) 44px; }
+  .haptic-pattern-name { grid-column: 1 / -1; }
+  .haptic-pattern-caption { align-items: flex-start; }
+}
+/* Capacitor's web view fills the phone: leave room for its notch and home bar. */
+.native-app .dearest .topbar { padding-top: calc(16px + env(safe-area-inset-top)); }
+.native-app .auth-page, .native-app .onboarding-page { padding-top: calc(30px + env(safe-area-inset-top)); }

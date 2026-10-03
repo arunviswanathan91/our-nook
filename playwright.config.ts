@@ -15,6 +15,6 @@ export default defineConfig({
     command: 'npm run dev -- --host 127.0.0.1 --port 4173 --strictPort',
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: false,
-    env: { VITE_SUPABASE_URL: 'https://nook-test.supabase.co', VITE_SUPABASE_PUBLISHABLE_KEY: 'test-publishable-key' },
+    env: { VITE_SUPABASE_URL: 'https://nook-test.supabase.co', VITE_SUPABASE_PUBLISHABLE_KEY: 'test-publishable-key', VITE_PUBLIC_WEB_URL: 'https://our-nook.example.test/' },
   },
 })
